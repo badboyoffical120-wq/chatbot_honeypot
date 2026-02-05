@@ -115,7 +115,7 @@ cancelBtn.addEventListener('click', () => {
 
 testBtn.addEventListener('click', async () => {
   const key = apiKey.value.trim();
-  const url = endpoint.value.trim();
+  let url = endpoint.value.trim();
   if (!key) {
     result.textContent = 'Error! Please provide an x-api-key.';
     result.className = 'error';
@@ -126,6 +126,13 @@ testBtn.addEventListener('click', async () => {
     result.className = 'error';
     return;
   }
+
+  // Ensure URL is relative if it starts with /
+  if (url.startsWith('/')) {
+    url = window.location.origin + url;
+  }
+
+  console.log('Fetching:', { method: 'POST', url, headers: { 'Content-Type': 'application/json', 'X-API-Key': key }, body: JSON.stringify({message: 'hello'}) });
 
   result.textContent = 'Testing...';
   result.className = '';
@@ -140,6 +147,7 @@ testBtn.addEventListener('click', async () => {
       body: JSON.stringify({message: 'hello'})
     });
     const txt = await res.text();
+    console.log('Response:', { status: res.status, statusText: res.statusText, body: txt });
     if (!res.ok) {
       result.textContent = `Error! API returned ${res.status}\n\n${txt}`;
       result.className = 'error';
@@ -148,6 +156,7 @@ testBtn.addEventListener('click', async () => {
       result.className = 'success';
     }
   } catch (e) {
+    console.error('Fetch error:', e);
     result.textContent = `Error! ${e.message}`;
     result.className = 'error';
   }
