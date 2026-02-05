@@ -301,6 +301,7 @@ def index():
 
 @app.get("/test")
 def tester():
+    # API Endpoint Tester page
     return render_template("test.html")
 
 
