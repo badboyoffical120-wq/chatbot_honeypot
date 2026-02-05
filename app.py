@@ -17,19 +17,27 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 # API Key Storage
-API_KEYS_FILE = "api_keys.json"
+os.makedirs(app.instance_path, exist_ok=True)
+API_KEYS_FILE = os.path.join(app.instance_path, "api_keys.json")
 
 def load_api_keys():
     """Load API keys from file"""
-    if os.path.exists(API_KEYS_FILE):
-        with open(API_KEYS_FILE, "r") as f:
-            return json.load(f)
-    return {}
+    try:
+        if not os.path.exists(API_KEYS_FILE):
+            return {}
+        with open(API_KEYS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 def save_api_keys(keys):
     """Save API keys to file"""
-    with open(API_KEYS_FILE, "w") as f:
-        json.dump(keys, f, indent=2)
+    try:
+        with open(API_KEYS_FILE, "w", encoding="utf-8") as f:
+            json.dump(keys, f, indent=2)
+    except Exception:
+        return
 
 HONEYPOT_PROMPT = """
 You are Ramesh Verma (46).
@@ -86,38 +94,51 @@ def _extract_api_key(req):
 def require_api_key(fn):
     @wraps(fn)
     def _wrapped(*args, **kwargs):
-        provided = _extract_api_key(request)
-        if not provided:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "error": "Unauthorized. Provide API key via X-API-Key or Authorization: Bearer.",
-                        "reply": "",
-                    }
-                ),
-                401,
-            )
-        
-        # Check against stored API keys
-        api_keys = load_api_keys()
-        if provided not in api_keys:
-            return (
-                jsonify(
-                    {
-                        "status": "error",
-                        "error": "Invalid API key.",
-                        "reply": "",
-                    }
-                ),
-                401,
-            )
-        
-        # Update last used timestamp
-        api_keys[provided]["last_used"] = datetime.now().isoformat()
-        save_api_keys(api_keys)
+        try:
+            provided = _extract_api_key(request)
+            if not provided:
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "error": "Unauthorized. Provide API key via X-API-Key or Authorization: Bearer.",
+                            "reply": "",
+                        }
+                    ),
+                    401,
+                )
 
-        return fn(*args, **kwargs)
+            # Check against stored API keys
+            api_keys = load_api_keys()
+            if provided not in api_keys:
+                return (
+                    jsonify(
+                        {
+                            "status": "error",
+                            "error": "Invalid API key.",
+                            "reply": "",
+                        }
+                    ),
+                    401,
+                )
+
+            # Update last used timestamp (best-effort)
+            if isinstance(api_keys.get(provided), dict):
+                api_keys[provided]["last_used"] = datetime.now().isoformat()
+                save_api_keys(api_keys)
+
+            return fn(*args, **kwargs)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "status": "error",
+                        "error": "Server error while validating API key.",
+                        "reply": "",
+                    }
+                ),
+                500,
+            )
 
     return _wrapped
 
@@ -448,7 +469,8 @@ def api_reset():
 def create_api_key():
     """Create a new API key"""
     api_key = secrets.token_urlsafe(32)
-    name = request.json.get("name", "Unnamed Key") if request.json else "Unnamed Key"
+    payload = request.get_json(silent=True) or {}
+    name = payload.get("name", "Unnamed Key")
     
     api_keys = load_api_keys()
     api_keys[api_key] = {
