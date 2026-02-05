@@ -378,6 +378,18 @@ def debug_auth():
     )
 
 
+@app.errorhandler(Exception)
+def handle_exception(e):
+    import traceback
+    tb = traceback.format_exc()
+    return jsonify({
+        "status": "error",
+        "error": "Internal server error",
+        "details": str(e),
+        "traceback": tb.splitlines()
+    }), 500
+
+
 def _handle_chat():
     _ensure_state()
 
