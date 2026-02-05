@@ -8,12 +8,14 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request, session
+from flask_cors import CORS
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key")
 
 # API Key Storage
@@ -80,7 +82,8 @@ NORMAL_PROMPT = "You are a helpful assistant."
 
 
 def _extract_api_key(req):
-    key = (req.headers.get("X-API-Key") or "").strip()
+    # Flask headers are case-insensitive, but some clients send lowercase.
+    key = (req.headers.get("X-API-Key") or req.headers.get("x-api-key") or "").strip()
     if key:
         return key
 
@@ -352,6 +355,27 @@ def tester():
 @app.get("/health")
 def health():
     return jsonify({"status": "success", "reply": "ok"})
+
+
+@app.get("/api/debug/auth")
+def debug_auth():
+    keys = _get_master_api_keys()
+
+    def _mask(k: str) -> str:
+        if not k:
+            return ""
+        if len(k) <= 8:
+            return "***"
+        return f"{k[:4]}***{k[-4:]}"
+
+    return jsonify(
+        {
+            "has_master_key": bool(keys),
+            "master_keys_count": len(keys),
+            "master_keys_masked": [_mask(k) for k in keys],
+            "master_keys_lengths": [len(k) for k in keys],
+        }
+    )
 
 
 def _handle_chat():
