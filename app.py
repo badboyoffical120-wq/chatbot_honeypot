@@ -358,7 +358,7 @@ def health():
     return jsonify({"status": "success", "reply": "ok"})
 
 
-@app.get("/api/debug/auth")
+@app.route("/api/debug/auth", methods=["GET", "POST"])
 def debug_auth():
     keys = _get_master_api_keys()
 
