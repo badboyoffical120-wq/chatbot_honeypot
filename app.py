@@ -91,7 +91,9 @@ def require_api_key(fn):
             return (
                 jsonify(
                     {
+                        "status": "error",
                         "error": "Unauthorized. Provide API key via X-API-Key or Authorization: Bearer.",
+                        "reply": "",
                     }
                 ),
                 401,
@@ -103,7 +105,9 @@ def require_api_key(fn):
             return (
                 jsonify(
                     {
+                        "status": "error",
                         "error": "Invalid API key.",
+                        "reply": "",
                     }
                 ),
                 401,
@@ -291,6 +295,11 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/health")
+def health():
+    return jsonify({"status": "success", "reply": "ok"})
+
+
 def _handle_chat():
     _ensure_state()
 
@@ -298,7 +307,7 @@ def _handle_chat():
     message = (data.get("message") or "").strip()
 
     if not message:
-        return jsonify({"error": "Empty message.", "reply": ""}), 400
+        return jsonify({"status": "error", "error": "Empty message.", "reply": ""}), 400
 
     result = detect_scam(message)
 
@@ -320,6 +329,7 @@ def _handle_chat():
         _save_history_objects(history)
         return jsonify(
             {
+                "status": "success",
                 "scam": result["is_scam"],
                 "confidence": result["confidence"],
                 "mode": mode,
@@ -333,6 +343,7 @@ def _handle_chat():
         _save_history_objects(history)
         return jsonify(
             {
+                "status": "success",
                 "scam": result["is_scam"],
                 "confidence": result["confidence"],
                 "mode": mode,
@@ -358,6 +369,7 @@ def _handle_chat():
 
             return jsonify(
                 {
+                    "status": "success",
                     "scam": result["is_scam"],
                     "confidence": result["confidence"],
                     "mode": mode,
@@ -378,7 +390,7 @@ def _handle_chat():
                 "Original error: "
                 + str(e)
             )
-        return jsonify({"error": msg, "reply": ""}), 500
+        return jsonify({"status": "error", "error": msg, "reply": ""}), 500
 
     history.append(AIMessage(content=reply))
     _save_history_objects(history)
@@ -386,6 +398,7 @@ def _handle_chat():
 
     return jsonify(
         {
+            "status": "success",
             "scam": result["is_scam"],
             "confidence": result["confidence"],
             "mode": mode,
@@ -408,14 +421,14 @@ def api_chat():
 @app.post("/reset")
 def reset():
     session.clear()
-    return jsonify({"ok": True})
+    return jsonify({"status": "success", "ok": True, "reply": ""})
 
 
 @app.post("/api/reset")
 @require_api_key
 def api_reset():
     session.clear()
-    return jsonify({"ok": True})
+    return jsonify({"status": "success", "ok": True, "reply": ""})
 
 
 @app.post("/api/keys/create")
