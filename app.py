@@ -11,6 +11,7 @@ from flask import Flask, jsonify, render_template, request, session
 from flask_cors import CORS
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
+from werkzeug.exceptions import HTTPException
 
 load_dotenv()
 
@@ -380,6 +381,13 @@ def debug_auth():
 
 @app.errorhandler(Exception)
 def handle_exception(e):
+    if isinstance(e, HTTPException):
+        return jsonify({
+            "status": "error",
+            "error": e.name,
+            "details": e.description,
+        }), e.code
+
     import traceback
     tb = traceback.format_exc()
     return jsonify({
