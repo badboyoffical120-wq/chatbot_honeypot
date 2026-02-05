@@ -192,16 +192,20 @@ def get_model():
     if _model is not None:
         return _model
 
-    token = os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+    token = os.environ.get("HUGGINGFACEHUB_API_TOKEN", "").strip()
     if not token:
         raise RuntimeError(
             "Missing HUGGINGFACEHUB_API_TOKEN in environment. Add it to .env and restart."
         )
+    
+    # Ensure HF_TOKEN is set for tokenizer download (used by ChatHuggingFace)
+    os.environ["HF_TOKEN"] = token
 
     repo_id = os.environ.get("HF_REPO_ID", "mistralai/Mistral-7B-Instruct-v0.2")
 
     llm = HuggingFaceEndpoint(
         repo_id=repo_id,
+        huggingfacehub_api_token=token,
         task="text-generation",
         temperature=0.5,
         max_new_tokens=60,
@@ -358,39 +362,36 @@ def _handle_chat():
     except Exception as e:
         msg = str(e)
         lower = msg.lower()
-        if "504" in lower or "gateway time-out" in lower or "gateway timeout" in lower:
+
+        reply = None
+        warning = ""
+
+        # Handle authentication/authorization errors
+        if "401" in lower or "unauthorized" in lower or "403" in lower or "forbidden" in lower:
+            error_type = "Authentication (401)" if "401" in lower else "Access Denied (403)"
+            warning = (
+                f"Hugging Face {error_type}. Check token/repo settings. "
+                f"Falling back to a basic reply. Original error: {msg}"
+            )
+            # Use the fast, non-LLM replies as a fallback
+            reply = _fast_honeypot_reply(message) if mode == "honeypot" else _fast_normal_reply(message)
+
+        # Handle timeout errors
+        elif "504" in lower or "gateway time-out" in lower or "gateway timeout" in lower:
+            warning = f"Model timed out. Falling back to a basic reply. Original error: {msg}"
             if mode == "honeypot":
                 reply = "Network slow hai. Aap phir se boliye?"
             else:
                 reply = "I’m having trouble reaching the model right now. Please try again."
 
+        # If we have a fallback reply, send it with a warning
+        if reply is not None:
             history.append(AIMessage(content=reply))
             _save_history_objects(history)
+            return jsonify({"status": "success", "scam": result["is_scam"], "confidence": result["confidence"], "mode": mode, "reply": reply, "warning": warning})
 
-            return jsonify(
-                {
-                    "status": "success",
-                    "scam": result["is_scam"],
-                    "confidence": result["confidence"],
-                    "mode": mode,
-                    "reply": reply,
-                    "warning": msg,
-                }
-            )
-        if "401" in lower or "unauthorized" in lower or "invalid token" in lower:
-            msg = (
-                "Hugging Face authentication failed. Check HUGGINGFACEHUB_API_TOKEN in .env "
-                "and restart the server. Original error: "
-                + str(e)
-            )
-        elif "403" in lower or "forbidden" in lower or "gated" in lower or "access" in lower:
-            msg = (
-                "Model access denied on Hugging Face. Either request access to the model, "
-                "or set HF_REPO_ID in .env to a public instruct model (e.g. mistralai/Mistral-7B-Instruct-v0.2). "
-                "Original error: "
-                + str(e)
-            )
-        return jsonify({"status": "error", "error": msg, "reply": ""}), 500
+        # For all other unhandled exceptions, return a 500 error
+        return jsonify({"status": "error", "error": f"An unexpected error occurred: {msg}", "reply": ""}), 500
 
     history.append(AIMessage(content=reply))
     _save_history_objects(history)
