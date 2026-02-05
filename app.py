@@ -91,6 +91,18 @@ def _extract_api_key(req):
     return ""
 
 
+def _get_master_api_keys():
+    raw = (
+        os.environ.get("MASTER_API_KEY")
+        or os.environ.get("API_KEY")
+        or os.environ.get("X_API_KEY")
+        or ""
+    ).strip()
+    if not raw:
+        return []
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
 def require_api_key(fn):
     @wraps(fn)
     def _wrapped(*args, **kwargs):
@@ -107,6 +119,11 @@ def require_api_key(fn):
                     ),
                     401,
                 )
+
+            master_keys = _get_master_api_keys()
+            for mk in master_keys:
+                if secrets.compare_digest(provided, mk):
+                    return fn(*args, **kwargs)
 
             # Check against stored API keys
             api_keys = load_api_keys()
