@@ -299,6 +299,11 @@ def index():
     return render_template("index.html")
 
 
+@app.get("/test")
+def tester():
+    return render_template("test.html")
+
+
 @app.get("/health")
 def health():
     return jsonify({"status": "success", "reply": "ok"})
