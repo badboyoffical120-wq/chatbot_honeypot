@@ -144,9 +144,12 @@ testBtn.addEventListener('click', async () => {
     }
   }
 
+  // Reflect the final URL back into the input so it's obvious what gets called.
+  endpoint.value = url;
+
   console.log('Fetching:', { method: 'POST', url, headers: { 'Content-Type': 'application/json', 'X-API-Key': key }, body: JSON.stringify({message: 'hello'}) });
 
-  result.textContent = 'Testing...';
+  result.textContent = `Testing...\n${url}`;
   result.className = '';
 
   try {

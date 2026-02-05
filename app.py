@@ -299,6 +299,12 @@ def index():
     return render_template("index.html")
 
 
+@app.post("/")
+@require_api_key
+def api_chat_root():
+    return _handle_chat()
+
+
 @app.get("/test")
 def tester():
     # API Endpoint Tester page
