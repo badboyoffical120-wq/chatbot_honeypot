@@ -127,9 +127,21 @@ testBtn.addEventListener('click', async () => {
     return;
   }
 
-  // Ensure URL is relative if it starts with /
-  if (url.startsWith('/')) {
-    url = window.location.origin + url;
+  // Normalize URL. If the user pastes only the site root, default to /api/chat.
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (!parsed.pathname || parsed.pathname === '/' || parsed.pathname === '') {
+      parsed.pathname = '/api/chat';
+    }
+    url = parsed.toString();
+  } catch (_) {
+    // Fallback for odd inputs
+    if (url.startsWith('/')) {
+      url = window.location.origin + url;
+    }
+    if (url === window.location.origin || url === window.location.origin + '/' || url.endsWith('//')) {
+      url = window.location.origin + '/api/chat';
+    }
   }
 
   console.log('Fetching:', { method: 'POST', url, headers: { 'Content-Type': 'application/json', 'X-API-Key': key }, body: JSON.stringify({message: 'hello'}) });
