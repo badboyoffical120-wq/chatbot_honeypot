@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: scam-detector-api
+    runtime: python-3.11
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHONUNBUFFERED
+        value: 1
